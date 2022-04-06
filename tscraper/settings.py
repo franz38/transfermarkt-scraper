@@ -13,3 +13,4 @@ VALUE_HIDE_SMALL_CLASS = "hide-for-small"
 VALUE_SHOW_SMALL_CLASS = "show-for-small"
 
 DATE_COLUMN_KEYWORDS = ["date", "from", "until"]
+INTEGER_COLUMN_KEYWORDS = ["goals", "assist", "cards", "minutes played"]

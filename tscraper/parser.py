@@ -38,6 +38,30 @@ def parse_image(td):
     return td.find("img")["alt"].strip()
 
 
+def parse_int(td):
+    currencies = ['$', '€', "'"]
+    txt = td.text
+
+    if txt=="":
+        return 0
+    
+    currency = None
+    for tmp_currency in currencies:
+        if tmp_currency in txt:
+            currency = tmp_currency
+            break
+    if currency:
+        txt = txt.replace(currency, '')
+        return int(txt)
+    else:
+        try:
+            txt = int(txt)
+            return txt
+        except:
+            print("Error with parsing")
+            return -1
+
+
 def parse_value(td):
 
     currencies = ['$', '€']

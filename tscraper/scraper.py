@@ -3,12 +3,13 @@ from bs4 import BeautifulSoup
 import pandas as pd
 import re
 
-from .parser import parse_generic, parse_player, parse_value, parse_date, parse_image
+from .parser import parse_generic, parse_int, parse_player, parse_value, parse_date, parse_image
 from .settings import *
 
 
 
 class Column:
+
     nameSet = None
     type = None
     colspan = 1
@@ -16,27 +17,38 @@ class Column:
     def __init__(self, label):
         self.label = label
 
+    def guess_type(self):
+
         for kw in DATE_COLUMN_KEYWORDS:
-            if kw in label:
-                self.type = "date"
+            if kw in self.label.lower():
+                self.type = TScraper.DATETIME64
                 break
+        for kw in INTEGER_COLUMN_KEYWORDS:
+            if kw in self.label.lower():
+                self.type = TScraper.INT64
+                break
+
+    def set_type(self, column_type):
+        self.type = column_type
 
 
 class TScraper:
 
-    columns_types = []
+    INT64 = 1
+    FLOAT64 = 2
+    DATETIME64 = 3
 
-    scraped = {}
+
+    __columns_types = []
+
+    __scraped = {}
     """ url: {"table1_title":table1, "table2_title":table2, ..}
     """
-
-    columns = []
-    soup = None
 
     def __init__(self, url=None, **kwargs):
 
         if kwargs and "columns_types" in kwargs:
-            self.columns_types = kwargs["columns_types"]
+            self.__columns_types = kwargs["columns_types"]
 
         # scrape
         if url is not None:
@@ -47,23 +59,23 @@ class TScraper:
 
     def __scrape(self, url):
         # return table dict
-        if url in self.scraped:
+        if url in self.__scraped:
             # page already scraped
-            return self.scraped[url]
+            return self.__scraped[url]
         else:
             page = requests.get(url, headers=REQUEST_HEADERS)
             soup = BeautifulSoup(page.content, "html.parser")
             tables = self.__get_boxes(soup)
-            self.scraped[url] = tables
+            self.__scraped[url] = tables
             return tables
 
 
     def __str__(self):
         tmp = ""
-        tmp += str(len(self.scraped.keys())) + " url scraped:\n"
+        tmp += str(len(self.__scraped.keys())) + " url scraped:\n"
 
-        for k in self.scraped.keys():
-            tables_dict = self.scraped[k]
+        for k in self.__scraped.keys():
+            tables_dict = self.__scraped[k]
             tmp += "## url: " + str(k) + " [ " + str(len(tables_dict.keys())) + " tables found ] :"
             tmp += '\n - ' + '\n - '.join(tables_dict.keys()) + "\n"
 
@@ -107,11 +119,18 @@ class TScraper:
 
         url = []
         tables_titles = []
+        dtypes = None
 
         if kwargs and "url" in kwargs:
             url = kwargs["url"]
         if kwargs and "table" in kwargs:
             tables_titles = [ x.lower() for x in kwargs["table"] ]
+        if kwargs and "guess_types" in kwargs:
+            guess_types = kwargs["guess_types"]
+        else:
+            guess_types = False
+        if kwargs and "dtypes" in kwargs:
+            dtypes = kwargs["dtypes"]
 
 
         if len(url) == 1:
@@ -120,7 +139,7 @@ class TScraper:
             dataframes = []
             for t_title in tables_titles:
                 table = tables_dict[t_title]
-                df = self.__extract_dataframe(table)
+                df = self.__extract_dataframe(table, guess_types, dtypes)
                 dataframes.append(df)
             print("Found " + str(len(dataframes)) + " tables in " + str(len(url)) + " urls")
             return dataframes
@@ -132,7 +151,7 @@ class TScraper:
             for u in url:
                 tables_dict = self.__scrape(u)
                 table = tables_dict[tables_titles[0]]
-                df = self.__extract_dataframe(table)
+                df = self.__extract_dataframe(table, guess_types, dtypes)
                 dataframes.append(df)
             print("Found " + str(len(dataframes)) + " tables in " + str(len(url)) + " urls")
             return dataframes
@@ -146,7 +165,7 @@ class TScraper:
                 t_title = tables_titles[i]
                 tables_dict = self.__scrape(u)
                 table = tables_dict[t_title]
-                df = self.__extract_dataframe(table)
+                df = self.__extract_dataframe(table, guess_types, dtypes)
                 dataframes.append(df)
             print("Found " + str(len(dataframes)) + " tables in " + str(len(url)) + " urls")
             return dataframes
@@ -155,14 +174,23 @@ class TScraper:
             print("Table or url format incorrect, must be..")
 
 
-    def __extract_dataframe(self, table):
+    def __extract_dataframe(self, table_soup, guess_types=False, dtypes=None):
 
         # header
-        theader = table.find("thead")
-        columns = self.__parse_header(theader)
+        theader = table_soup.find("thead")
+        columns = self.__parse_header(theader, guess_types)
+
+        if dtypes is not None:
+            for column in columns:
+                if column.label in dtypes:
+                    dtype = dtypes[column.label]
+                    column.set_type(dtype)
+
+        # for column in columns:
+        #     print( column.label + ": " + str(column.type))
 
         # rows
-        tbody = table.find("tbody")
+        tbody = table_soup.find("tbody")
         rows = tbody.find_all("tr", recursive=False)
 
         if len(rows) == 0 and tbody.find_all("td", recursive=False):
@@ -185,24 +213,27 @@ class TScraper:
         # parse rows
         row_values_list = []
         for row in rows:
-            values = self.__parse_row(row, columns)
+            values = self.__parse_row(row, columns, guess_types)
             if values is not None:
                 row_values_list.append(values)
 
         # make df
         df = pd.DataFrame(row_values_list, columns=[x.label for x in columns])
+
+        # change dtypes
         for col in columns:
-            if col.type == "date":
+            if col.type == TScraper.DATETIME64:
                 df = df.astype({col.label: 'datetime64'})
-            elif col.type == "int":
+            elif col.type == TScraper.INT64:
+                df[col.label] = df[col.label].fillna(0)
                 df = df.astype({col.label: 'int64'})
-            elif col.type == "float":
+            elif col.type == TScraper.FLOAT64:
                 df = df.astype({col.label: 'float64'})
 
         return df
 
 
-    def __parse_header(self, theader):
+    def __parse_header(self, theader, guess_types=False):
 
         th_s = theader.find_all("th")
         cols = []
@@ -216,8 +247,11 @@ class TScraper:
                         txt = th.find("span", {"class": TABLE_HEADER_ICON_CLASS})["title"]
 
                 col = Column(txt)
-                if i < len(self.columns_types) and self.columns_types[i]:
-                    col.type = self.columns_types[i]
+                if guess_types:
+                    col.guess_type()
+
+                if i < len(self.__columns_types) and self.__columns_types[i]:
+                    col.type = self.__columns_types[i]
                 cols.append(col)
 
                 if th.has_attr("colspan"):
@@ -227,7 +261,7 @@ class TScraper:
 
         return cols
 
-    def __parse_row(self, td_arr, columns):
+    def __parse_row(self, td_arr, columns, guess_types=False):
 
         values = []
 
@@ -249,16 +283,27 @@ class TScraper:
 
             else:
 
-                if col and col.type == "date":
-                    values.append(parse_date(td))
-                # elif (col and col.type=="value"):
-                #     tmp.append(self.parse_value(td))
-                elif header == "player":
-                    values.append(parse_player(td))
-                elif header == "Nat.":
-                    values.append(parse_image(td))
+                if guess_types and col.type is not None:
+                    #print(col.type)
+                    if col.type == TScraper.DATETIME64:
+                        values.append(parse_date(td))
+                    elif col.type == TScraper.INT64:
+                        values.append(parse_int(td))
+                    else:
+                        values.append(parse_generic(td))
                 else:
                     values.append(parse_generic(td))
+
+                # if col and col.type == TScraper.DATETIME64:
+                #     values.append(parse_date(td))
+                # # elif (col and col.type=="value"):
+                # #     tmp.append(self.parse_value(td))
+                # elif header == "player":
+                #     values.append(parse_player(td))
+                # elif header == "Nat.":
+                #     values.append(parse_image(td))
+                # else:
+
 
         if len(values) != len(columns):
             return None
