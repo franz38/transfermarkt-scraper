@@ -6,7 +6,6 @@ import re
 from .parser import parse_generic, parse_player, parse_value, parse_date, parse_image
 from .settings import *
 
-date_keywords = ["date", "from", "until"]
 
 
 class Column:
@@ -17,7 +16,7 @@ class Column:
     def __init__(self, label):
         self.label = label
 
-        for kw in date_keywords:
+        for kw in DATE_COLUMN_KEYWORDS:
             if kw in label:
                 self.type = "date"
                 break
@@ -91,10 +90,10 @@ class TScraper:
                 else:
                     continue
 
-            if box.find("div", {"class": ["table-header", "subkategorie-header"]}, recursive=False):
-                title = box.find("div", {"class": ["table-header", "subkategorie-header"]}, recursive=False).text
-            elif box.find(["h1", "h2", "h3", "h4", "h5"], recursive=False):
-                title = box.find(["h1", "h2", "h3", "h4", "h5"], recursive=False).text
+            if box.find("div", {"class": TM_BOX_HEADER_CLASS}, recursive=False):
+                title = box.find("div", {"class": TM_BOX_HEADER_CLASS}, recursive=False).text
+            elif box.find(HTML_HEADERS, recursive=False):
+                title = box.find(HTML_HEADERS, recursive=False).text
             else:
                 title = str(i)
             boxes_dict[title.strip().lower()] = table
@@ -186,7 +185,7 @@ class TScraper:
         # parse rows
         row_values_list = []
         for row in rows:
-            values = self.parse_row(row, columns)
+            values = self.__parse_row(row, columns)
             if values is not None:
                 row_values_list.append(values)
 
@@ -212,9 +211,9 @@ class TScraper:
                 pass
             else:
                 txt = th.text.strip()
-                if txt == "" and th.find("span", {"class": "icons_sprite"}):
-                    if th.find("span", {"class": "icons_sprite"}).has_attr("title"):
-                        txt = th.find("span", {"class": "icons_sprite"})["title"]
+                if txt == "" and th.find("span", {"class": TABLE_HEADER_ICON_CLASS}):
+                    if th.find("span", {"class": TABLE_HEADER_ICON_CLASS}).has_attr("title"):
+                        txt = th.find("span", {"class": TABLE_HEADER_ICON_CLASS})["title"]
 
                 col = Column(txt)
                 if i < len(self.columns_types) and self.columns_types[i]:
@@ -228,7 +227,7 @@ class TScraper:
 
         return cols
 
-    def parse_row(self, td_arr, columns):
+    def __parse_row(self, td_arr, columns):
 
         values = []
 

@@ -1,12 +1,13 @@
 import re
+from .settings import *
 
 def parse_generic(td):
     txt = td.text.strip()
 
     if (not td.has_attr('class') or "no-border-links" in td['class']) and td.find("a", recursive=False ):
         link = td.find("a", recursive=False )
-        if (link.find("span", {"class": "hide-for-small"})) and (link.find("span", {"class": "show-for-small"})):
-            txt = link.find("span", {"class": "hide-for-small"}).text.strip()
+        if (link.find("span", {"class": VALUE_HIDE_SMALL_CLASS})) and (link.find("span", {"class": VALUE_SHOW_SMALL_CLASS})):
+            txt = link.find("span", {"class": VALUE_HIDE_SMALL_CLASS}).text.strip()
         else:
             txt = link.text.strip()
 
@@ -25,8 +26,8 @@ def parse_player(td):
     if (td.find("table")):
         tr_s = td.find("table").find_all("tr", recursive=False)
         name_item, position_item = tr_s
-        if (name_item.find("span", {"class": "hide-for-small"})) and (name_item.find("span", {"class": "show-for-small"})):
-            name = name_item.find("span", {"class": "hide-for-small"}).text
+        if (name_item.find("span", {"class": VALUE_HIDE_SMALL_CLASS})) and (name_item.find("span", {"class": VALUE_SHOW_SMALL_CLASS})):
+            name = name_item.find("span", {"class": VALUE_HIDE_SMALL_CLASS}).text
         else:
             name = name_item.text
 
