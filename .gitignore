@@ -1,0 +1,7 @@
+venv/
+.gitignore
+main.py
+chart2.ipynb
+charts.ipynb
+geckodriver.log
+.idea/
