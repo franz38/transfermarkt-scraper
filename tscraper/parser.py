@@ -22,7 +22,6 @@ def parse_generic(td):
 def parse_player(td):
 
     name = td.text
-    position = ""
     if (td.find("table")):
         tr_s = td.find("table").find_all("tr", recursive=False)
         name_item, position_item = tr_s
@@ -44,7 +43,7 @@ def parse_int(td):
 
     if txt=="":
         return 0
-    
+
     currency = None
     for tmp_currency in currencies:
         if tmp_currency in txt:

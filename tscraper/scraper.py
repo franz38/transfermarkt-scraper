@@ -76,7 +76,7 @@ class TScraper:
 
         for k in self.__scraped.keys():
             tables_dict = self.__scraped[k]
-            tmp += "## url: " + str(k) + " [ " + str(len(tables_dict.keys())) + " tables found ] :"
+            tmp += "## url: " + str(k) + "\n[ " + str(len(tables_dict.keys())) + " tables found ] :"
             tmp += '\n - ' + '\n - '.join(tables_dict.keys()) + "\n"
 
         return tmp
@@ -186,8 +186,6 @@ class TScraper:
                     dtype = dtypes[column.label]
                     column.set_type(dtype)
 
-        # for column in columns:
-        #     print( column.label + ": " + str(column.type))
 
         # rows
         tbody = table_soup.find("tbody")
