@@ -11,3 +11,12 @@ dataframes = scraper.extract_tables(
     table=["ARRIVALS 21/22", "ARRIVALS 20/21"]
 )
 ```
+
+## Parameters
+| parameter | type                                             | default value |
+|--------|--------------------------------------------------|---------------|
+| url    | array of string                                  | ```[]```      |
+| table  | array of string                                  | ```[]```      |
+| auto_dtypes | boolean                                          | ```False```   |
+| dtypes | dictionary {```column name```:```dtype```, ... } | ```{}```      |
+

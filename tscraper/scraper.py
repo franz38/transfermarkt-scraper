@@ -1,42 +1,20 @@
 import requests
 from bs4 import BeautifulSoup
 import pandas as pd
-import re
 
-from .parser import parse_generic, parse_int, parse_player, parse_value, parse_date, parse_image
 from .settings import *
+from .column_manager import Column, PlayerColumn, NumericColumn, TeamColumn, DateColumn
 
 
-
-class Column:
-
-    nameSet = None
-    type = None
-    colspan = 1
-
-    def __init__(self, label):
-        self.label = label
-
-    def guess_type(self):
-
-        for kw in DATE_COLUMN_KEYWORDS:
-            if kw in self.label.lower():
-                self.type = TScraper.DATETIME64
-                break
-        for kw in INTEGER_COLUMN_KEYWORDS:
-            if kw in self.label.lower():
-                self.type = TScraper.INT64
-                break
-
-    def set_type(self, column_type):
-        self.type = column_type
 
 
 class TScraper:
 
-    INT64 = 1
-    FLOAT64 = 2
-    DATETIME64 = 3
+    INT64 = INT64
+    FLOAT64 = FLOAT64
+    DATETIME64 = DATETIME64
+    TEAM = TEAM
+    PLAYER = PLAYER
 
 
     __columns_types = []
@@ -112,14 +90,14 @@ class TScraper:
 
         return boxes_dict
 
-    def extract_chart(self, url, chart_title):
-        pass
+    # def extract_chart(self, url, chart_title):
+    #     pass
 
     def extract_tables(self, **kwargs):
 
         url = []
         tables_titles = []
-        dtypes = None
+        dtypes = {}
 
         if kwargs and "url" in kwargs:
             url = kwargs["url"]
@@ -174,17 +152,11 @@ class TScraper:
             print("Table or url format incorrect, must be..")
 
 
-    def __extract_dataframe(self, table_soup, guess_types=False, dtypes=None):
+    def __extract_dataframe(self, table_soup, guess_types=False, dtypes={}):
 
         # header
         theader = table_soup.find("thead")
-        columns = self.__parse_header(theader, guess_types)
-
-        if dtypes is not None:
-            for column in columns:
-                if column.label in dtypes:
-                    dtype = dtypes[column.label]
-                    column.set_type(dtype)
+        columns = self.__parse_header(theader, guess_types, dtypes)
 
 
         # rows
@@ -209,32 +181,38 @@ class TScraper:
             rows = tmp
 
         # parse rows
-        row_values_list = []
         for row in rows:
-            values = self.__parse_row(row, columns, guess_types)
-            if values is not None:
-                row_values_list.append(values)
+            self.__parse_row(row, columns)
+
+
+        # make dict
+        columns_dict = {}
+        for column in columns:
+            column.parse()
+            for col_h, col_vals in column.get():
+                columns_dict[col_h] = col_vals
+                print(col_h + " : " + str(len(col_vals)))
+
+                if col_h == "Pos.":
+                    print(col_vals)
+
 
         # make df
-        df = pd.DataFrame(row_values_list, columns=[x.label for x in columns])
+        df = pd.DataFrame(columns_dict)
 
         # change dtypes
         for col in columns:
-            if col.type == TScraper.DATETIME64:
-                df = df.astype({col.label: 'datetime64'})
-            elif col.type == TScraper.INT64:
-                df[col.label] = df[col.label].fillna(0)
-                df = df.astype({col.label: 'int64'})
-            elif col.type == TScraper.FLOAT64:
+            if isinstance(col, NumericColumn):
                 df = df.astype({col.label: 'float64'})
 
         return df
 
 
-    def __parse_header(self, theader, guess_types=False):
+    def __parse_header(self, theader, guess_types, dtypes):
 
         th_s = theader.find_all("th")
         cols = []
+
         for i, th in enumerate(th_s):
             if (th.has_attr('class')) and ("hide" in th['class']):
                 pass
@@ -245,66 +223,50 @@ class TScraper:
                         txt = th.find("span", {"class": TABLE_HEADER_ICON_CLASS})["title"]
 
                 col = Column(txt)
-                if guess_types:
-                    col.guess_type()
 
-                if i < len(self.__columns_types) and self.__columns_types[i]:
-                    col.type = self.__columns_types[i]
+                if txt in dtypes:
+                    datatype = dtypes[txt]
+                    if datatype == PLAYER:
+                        col = PlayerColumn(txt)
+                    elif datatype == TEAM:
+                        col = TeamColumn(txt)
+                    elif datatype == FLOAT64:
+                        col = NumericColumn(txt)
+                    elif datatype == DATETIME64:
+                        col = DateColumn(txt)
+
+                elif guess_types:
+                    for kw in PLAYER_COLUMN_KEYWORDS:
+                        if kw in txt.lower():
+                            col = PlayerColumn(txt)
+                            break
+                    for kw in INTEGER_COLUMN_KEYWORDS:
+                        if kw in txt.lower():
+                            col = NumericColumn(txt)
+                            break
+
                 cols.append(col)
 
                 if th.has_attr("colspan"):
                     col.colspan = int(th["colspan"])
                     for j in range(int(th["colspan"]) - 1):
-                        cols.append(col)
+                        newcol = Column(txt + "_" + str(j+1))
+                        cols.append(newcol)
 
         return cols
 
-    def __parse_row(self, td_arr, columns, guess_types=False):
+    def __parse_row(self, td_arr, columns):
 
         values = []
 
-        for i, td in enumerate(td_arr):
+        filtered = list(filter(lambda x: not (x.has_attr('class') and "hide" in x['class']) , td_arr))
 
-            header = columns[i].label
-            col = columns[i]
+        for z, col in enumerate(columns):
 
-            if (td.has_attr('class')) and ("hide" in td['class']):
-                pass
-
-            elif td.has_attr('colspan'):
-                colspan = int(td["colspan"])
-
-                for j in range(colspan):
-                    if len(values) == len(columns):
-                        break
-                    values.append(None)
-
+            if not len(td_arr)>z:
+                col.add(None)
             else:
+                td = filtered[z]
+                col.add(td)
 
-                if guess_types and col.type is not None:
-                    #print(col.type)
-                    if col.type == TScraper.DATETIME64:
-                        values.append(parse_date(td))
-                    elif col.type == TScraper.INT64:
-                        values.append(parse_int(td))
-                    else:
-                        values.append(parse_generic(td))
-                else:
-                    values.append(parse_generic(td))
-
-                # if col and col.type == TScraper.DATETIME64:
-                #     values.append(parse_date(td))
-                # # elif (col and col.type=="value"):
-                # #     tmp.append(self.parse_value(td))
-                # elif header == "player":
-                #     values.append(parse_player(td))
-                # elif header == "Nat.":
-                #     values.append(parse_image(td))
-                # else:
-
-
-        if len(values) != len(columns):
-            return None
-
-        # print(values)
         return values

@@ -1,7 +1,8 @@
 venv/
 .gitignore
+market_scrape.py
 main.py
-chart2.ipynb
-charts.ipynb
-geckodriver.log
+../tscraper-testing/chart2.ipynb
+../tscraper-testing/charts.ipynb
+../tscraper-testing/geckodriver.log
 .idea/

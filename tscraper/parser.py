@@ -2,6 +2,10 @@ import re
 from .settings import *
 
 def parse_generic(td):
+
+    if td is None:
+        return None
+
     txt = td.text.strip()
 
     if (not td.has_attr('class') or "no-border-links" in td['class']) and td.find("a", recursive=False ):
@@ -22,77 +26,96 @@ def parse_generic(td):
 def parse_player(td):
 
     name = td.text
-    if (td.find("table")):
+    position = None
+
+    if td.find("table"):
         tr_s = td.find("table").find_all("tr", recursive=False)
         name_item, position_item = tr_s
         if (name_item.find("span", {"class": VALUE_HIDE_SMALL_CLASS})) and (name_item.find("span", {"class": VALUE_SHOW_SMALL_CLASS})):
             name = name_item.find("span", {"class": VALUE_HIDE_SMALL_CLASS}).text
         else:
             name = name_item.text
+        position = position_item.text.strip()
 
-    return name.strip()
+    return name.strip(), position
+
+
+def parse_team(td):
+
+    return parse_player(td)
+
 
 
 def parse_image(td):
     return td.find("img")["alt"].strip()
 
 
-def parse_int(td):
-    currencies = ['$', '€', "'"]
+
+
+def extract_value(txt):
+
+    search = re.search("[$€\']?[0-9.,]+(m|Th.)?", txt)
+    if len(re.findall("[$€\']?[0-9.,]+(m|Th.)?", txt)) != 1:
+        return None
+
+    if search is not None:
+
+        value = search.group(0)
+        unit = re.search("[$€\']", value)
+        prefix = re.search("(m|Th.)", value)
+
+        if unit is not None:
+            unit = unit.group(0)
+            value = value.replace(unit, '')
+
+        if prefix is not None:
+            prefix = prefix.group(0)
+            value = value.replace(prefix, '')
+
+        return value, unit, prefix
+    return None
+
+
+def parse_numeric(td):
+    
     txt = td.text
+    sub_text = None
 
-    if txt=="":
-        return 0
+    if td.find("a") and td.find("a").find("i"):
+        sub_element = td.find("a").find("i")
+        sub_text = sub_element.text
+        txt = txt.replace(sub_text, '')
 
-    currency = None
-    for tmp_currency in currencies:
-        if tmp_currency in txt:
-            currency = tmp_currency
-            break
-    if currency:
-        txt = txt.replace(currency, '')
-        return int(txt)
+    value = 0
+    unit = prefix = other = None
+
+    if txt is not None and extract_value(txt) is not None:
+        value, unit, prefix = extract_value(txt)
+        other = sub_text
+
+    elif sub_text is not None and extract_value(sub_text) is not None:
+        value, unit, prefix = extract_value(sub_text)
+        other = txt
+
     else:
-        try:
-            txt = int(txt)
-            return txt
-        except:
-            print("Error with parsing")
-            return -1
+        if txt is not None and txt != "" and txt != "-":
+            other = str(txt)
+        if sub_text is not None and sub_text != "" and sub_text != "-":
+            other += str(sub_text)
 
-
-def parse_value(td):
-
-    currencies = ['$', '€']
-    currency = None
-    txt = td.text
-    for tmp_currency in currencies:
-        if tmp_currency in txt:
-            currency = tmp_currency
-            break
-    txt = txt.replace(currency, '')
-
-
-    multiples = {
-        'Th.':1000,
-        'm':1000000
-    }
-    mult=1
-    for k in multiples:
-        if k in txt:
-            mult = multiples[k]
-            txt=txt.replace(k, '')
-            break
-    return txt
+    return value, unit, prefix, other
 
 
 def parse_date(td):
 
     txt = td.text
-    if re.search('\(..\)', td.text):
+    age = None
+    if re.search('\([0-9]{1,2}\)', td.text):
         age = re.search('\(..\)', td.text).group(0)
         txt = txt.replace(age, '')
         age = age.replace('(','').replace(')','')
 
     txt = txt.replace(',', '')
-    return txt.strip()
+    return txt.strip(), age
+
+

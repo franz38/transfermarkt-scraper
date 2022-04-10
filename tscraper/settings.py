@@ -13,3 +13,10 @@ VALUE_SHOW_SMALL_CLASS = "show-for-small"
 
 DATE_COLUMN_KEYWORDS = ["date", "from", "until"]
 INTEGER_COLUMN_KEYWORDS = ["goals", "assist", "cards", "minutes played"]
+PLAYER_COLUMN_KEYWORDS = ['player']
+
+INT64 = 1
+FLOAT64 = 2
+DATETIME64 = 3
+TEAM = 4
+PLAYER = 5
