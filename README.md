@@ -1,5 +1,5 @@
 # Transfermarkt scraper
-
+A simple python package that facilitates transfermarkt scraping
 ## Usage
 ```python
 from tscraper.scraper import TScraper
@@ -12,11 +12,40 @@ dataframes = scraper.extract_tables(
 )
 ```
 
+## DataTypes
+
+The default value of ```auto_dtypes``` is ```False```, 
+in this way TScraper will just return the text found 
+in the columns, however for certain column types this behavior 
+could create problems.
+
+Setting ```auto_dtypes``` to ```True``` will allow TScraper to automatically
+detect the column format and parse it accordingly.
+
+Through the ```dtypes``` parameter it is also possible to 
+directly define the way in which the column will be analyzed.
+
+```python
+dataframes = scraper.extract_tables(
+    url = [ ... ],
+    table = [ ... ],
+    auto_dtypes = True,
+    dtypes = {
+        "column_1":TScraper.PLAYER,
+        "column_2":TScraper.DATE,
+              }
+)
+```
+
+Available values are: ```DEFAULT```, ```NUMERIC```, 
+```DATETIME```, ```TEAM```, ```PLAYER```
+
+
 ## Parameters
-| parameter | type                                             | default value |
-|--------|--------------------------------------------------|---------------|
-| url    | array of string                                  | ```[]```      |
-| table  | array of string                                  | ```[]```      |
-| auto_dtypes | boolean                                          | ```False```   |
-| dtypes | dictionary {```column name```:```dtype```, ... } | ```{}```      |
+| parameter | type                       | default value |
+|--------|----------------------------|---------------|
+| url    | string or array of strings | ```[]```      |
+| table  | string or array of strings | ```[]```      |
+| auto_dtypes | boolean                    | ```False```   |
+| dtypes | dictionary                 | ```{}```      |
 
