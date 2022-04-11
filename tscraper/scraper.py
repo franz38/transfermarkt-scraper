@@ -6,18 +6,13 @@ from .settings import *
 from .column_manager import Column, PlayerColumn, NumericColumn, TeamColumn, DateColumn
 
 
-
-
 class TScraper:
 
-    INT64 = INT64
-    FLOAT64 = FLOAT64
-    DATETIME64 = DATETIME64
+    DEFAULT = DEFAULT
+    NUMERIC = NUMERIC
+    DATETIME = DATETIME
     TEAM = TEAM
     PLAYER = PLAYER
-
-
-    __columns_types = []
 
     __scraped = {}
     """ url: {"table1_title":table1, "table2_title":table2, ..}
@@ -25,14 +20,9 @@ class TScraper:
 
     def __init__(self, url=None, **kwargs):
 
-        if kwargs and "columns_types" in kwargs:
-            self.__columns_types = kwargs["columns_types"]
-
         # scrape
         if url is not None:
             soup = self.__scrape(url)
-            print(self)
-
 
 
     def __scrape(self, url):
@@ -101,55 +91,55 @@ class TScraper:
 
         if kwargs and "url" in kwargs:
             url = kwargs["url"]
+            if isinstance(url, str):
+                tmp = url
+                url = [tmp]
+
         if kwargs and "table" in kwargs:
-            tables_titles = [ x.lower() for x in kwargs["table"] ]
+            tables_titles = kwargs["table"]
+            if isinstance(tables_titles, str):
+                tmp = tables_titles
+                tables_titles = [tmp]
+            tables_titles = [ x.lower() for x in tables_titles ]
+
         if kwargs and "guess_types" in kwargs:
             guess_types = kwargs["guess_types"]
         else:
             guess_types = False
+
         if kwargs and "dtypes" in kwargs:
             dtypes = kwargs["dtypes"]
 
 
-        if len(url) == 1:
-            # 1 page, n tables
-            tables_dict = self.__scrape(url[0])
-            dataframes = []
-            for t_title in tables_titles:
-                table = tables_dict[t_title]
-                df = self.__extract_dataframe(table, guess_types, dtypes)
-                dataframes.append(df)
-            print("Found " + str(len(dataframes)) + " tables in " + str(len(url)) + " urls")
-            return dataframes
 
+        """
+        
+        """
+        pairs = []
+        if len(url) == 1:
+            for t_title in tables_titles:
+                pairs.append((url[0], t_title))
 
         elif len(tables_titles) == 1:
-            # same table in multiple pages
-            dataframes = []
             for u in url:
-                tables_dict = self.__scrape(u)
-                table = tables_dict[tables_titles[0]]
-                df = self.__extract_dataframe(table, guess_types, dtypes)
-                dataframes.append(df)
-            print("Found " + str(len(dataframes)) + " tables in " + str(len(url)) + " urls")
-            return dataframes
-
+                pairs.append( (u, tables_titles[0]) )
 
         elif len(url) == len(tables_titles):
-            # 1to1 between urls and tables
-            dataframes = []
             for i in range(len(url)):
                 u = url[i]
                 t_title = tables_titles[i]
-                tables_dict = self.__scrape(u)
-                table = tables_dict[t_title]
-                df = self.__extract_dataframe(table, guess_types, dtypes)
-                dataframes.append(df)
-            print("Found " + str(len(dataframes)) + " tables in " + str(len(url)) + " urls")
-            return dataframes
+                pairs.append( (u, t_title))
 
         else:
             print("Table or url format incorrect, must be..")
+
+        dataframes = []
+        for url, table_name in pairs:
+            tables_dict = self.__scrape(url)
+            table = tables_dict[table_name]
+            df = self.__extract_dataframe(table, guess_types, dtypes)
+            dataframes.append(df)
+        return dataframes
 
 
     def __extract_dataframe(self, table_soup, guess_types=False, dtypes={}):
@@ -230,9 +220,9 @@ class TScraper:
                         col = PlayerColumn(txt)
                     elif datatype == TEAM:
                         col = TeamColumn(txt)
-                    elif datatype == FLOAT64:
+                    elif datatype == NUMERIC:
                         col = NumericColumn(txt)
-                    elif datatype == DATETIME64:
+                    elif datatype == DATETIME:
                         col = DateColumn(txt)
 
                 elif guess_types:

@@ -15,8 +15,8 @@ DATE_COLUMN_KEYWORDS = ["date", "from", "until"]
 INTEGER_COLUMN_KEYWORDS = ["goals", "assist", "cards", "minutes played"]
 PLAYER_COLUMN_KEYWORDS = ['player']
 
-INT64 = 1
-FLOAT64 = 2
-DATETIME64 = 3
+DEFAULT = 1
+NUMERIC = 2
+DATETIME = 3
 TEAM = 4
 PLAYER = 5
