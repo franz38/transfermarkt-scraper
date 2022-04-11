@@ -3,9 +3,11 @@ from bs4 import BeautifulSoup
 import pandas as pd
 import re
 
-from .parser import parse_generic, parse_numeric, parse_player, parse_date, parse_image
+from .parser import parse_generic, parse_numeric, parse_player, parse_date
 
+""" Boolean
 
+"""
 def is_column_meaningful(mylist):
     return len(list(filter(lambda val: val is not None, mylist))) > 0
 
@@ -29,12 +31,17 @@ class Column:
             value = parse_generic(td)
             self.values.append(value)
 
+    """ Return a list of tuples with one element, first element of the tuple 
+        is the column label, the second element is the list of values
+    """
     def get(self):
 
         tmp = []
         tmp.append((self.label, self.values))
         return tmp
 
+    """
+    """
     def __str__(self):
         tmp = ""
         for val in self.values:
@@ -55,6 +62,10 @@ class PlayerColumn(Column):
             self.values.append(value)
             self.positions.append(position)
 
+    """ Return a list of tuples, first element is the column label, 
+        the second element is the list of values.
+        The optional tuple contains the roles extracted from player column (if any)
+    """
     def get(self):
         tmp = []
         tmp.append((self.label, self.values))
@@ -76,6 +87,10 @@ class TeamColumn(Column):
             self.values.append(value)
             self.leagues.append(league)
 
+    """ Return a list of tuples, first element is the column label, 
+        the second element is the list of values.
+        The optional tuple contains the leagues of the teams (if any)
+    """
     def get(self):
         tmp = []
         tmp.append((self.label, self.values))
@@ -97,6 +112,10 @@ class DateColumn(Column):
             self.values.append(value)
             self.ages.append(age)
 
+    """ Return a list of tuples, first element is the column label, 
+        the second element is the list of values.
+        The optional tuple contains the ages of the players (if any)
+    """
     def get(self):
         tmp = []
         tmp.append((self.label, self.values))
@@ -134,7 +153,11 @@ class NumericColumn(Column):
         pow_ = multiples[from_mult] - multiples[to_mult]
         return pow(10, pow_)
 
-
+    """ Return a list of tuples, first element is the column label, 
+        the second element is the list of values.
+        The optional tuple contains non numeric comments 
+        extracted from the column (if any)
+    """
     def get(self):
         tmp = []
 
