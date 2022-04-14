@@ -3,11 +3,10 @@ from bs4 import BeautifulSoup
 import pandas as pd
 
 from .settings import *
-from .column_manager import Column, PlayerColumn, NumericColumn, TeamColumn, DateColumn
+from .column_manager import VirtualTable, Column, PlayerColumn, NumericColumn, TeamColumn, DateColumn
 
 
 class TScraper:
-
     DEFAULT = DEFAULT
     NUMERIC = NUMERIC
     DATETIME = DATETIME
@@ -24,7 +23,6 @@ class TScraper:
         if url is not None:
             soup = self.__scrape(url)
 
-
     def __scrape(self, url):
         # return table dict
         if url in self.__scraped:
@@ -37,7 +35,6 @@ class TScraper:
             self.__scraped[url] = tables
             return tables
 
-
     def __str__(self):
         tmp = ""
         tmp += str(len(self.__scraped.keys())) + " url scraped:\n"
@@ -48,7 +45,6 @@ class TScraper:
             tmp += '\n - ' + '\n - '.join(tables_dict.keys()) + "\n"
 
         return tmp
-
 
     def __get_boxes(self, soup):
         boxes_dict = {}
@@ -100,7 +96,7 @@ class TScraper:
             if isinstance(tables_titles, str):
                 tmp = tables_titles
                 tables_titles = [tmp]
-            tables_titles = [ x.lower() for x in tables_titles ]
+            tables_titles = [x.lower() for x in tables_titles]
 
         if kwargs and "guess_types" in kwargs:
             guess_types = kwargs["guess_types"]
@@ -109,8 +105,6 @@ class TScraper:
 
         if kwargs and "dtypes" in kwargs:
             dtypes = kwargs["dtypes"]
-
-
 
         """
         
@@ -122,32 +116,51 @@ class TScraper:
 
         elif len(tables_titles) == 1:
             for u in url:
-                pairs.append( (u, tables_titles[0]) )
+                pairs.append((u, tables_titles[0]))
 
         elif len(url) == len(tables_titles):
             for i in range(len(url)):
                 u = url[i]
                 t_title = tables_titles[i]
-                pairs.append( (u, t_title))
+                pairs.append((u, t_title))
 
         else:
             print("Table or url format incorrect, must be..")
 
         dataframes = []
+        ttt = None
         for url, table_name in pairs:
             tables_dict = self.__scrape(url)
             table = tables_dict[table_name]
-            df = self.__extract_dataframe(table, guess_types, dtypes)
-            dataframes.append(df)
-        return dataframes
 
+            table = self.__extract_dataframe(table, guess_types, dtypes)
+            if ttt is None:
+                ttt = table
+            elif ttt == table:
+                ttt.add(table)
+            # table_dict = table.get()
+            # print(table_dict)
+            # df = pd.DataFrame(table_dict)
+            # print(df)
+
+            # change dtypes
+            # for col in columns:
+            #     if isinstance(col, NumericColumn):
+            #         df = df.astype({col.label: 'float64'})
+
+            # dataframes.append(df)
+
+        dicttt = ttt.get()
+        df = pd.DataFrame(dicttt)
+        return df
 
     def __extract_dataframe(self, table_soup, guess_types=False, dtypes={}):
 
         # header
         theader = table_soup.find("thead")
-        columns = self.__parse_header(theader, guess_types, dtypes)
+        # columns = self.__parse_header(theader, guess_types, dtypes)
 
+        table = VirtualTable(theader, guess_types, dtypes)
 
         # rows
         tbody = table_soup.find("tbody")
@@ -159,7 +172,7 @@ class TScraper:
             row = []
             for i, td in enumerate(td_s):
                 row.append(td)
-                if len(row) == len(columns):
+                if len(row) == len(table.columns):
                     tmp.append(row)
                     row = []
             rows = tmp
@@ -172,31 +185,31 @@ class TScraper:
 
         # parse rows
         for row in rows:
-            self.__parse_row(row, columns)
-
+            table.parse_row(row)
+            # self.__parse_row(row, columns)
 
         # make dict
-        columns_dict = {}
-        for column in columns:
-            column.parse()
-            for col_h, col_vals in column.get():
-                columns_dict[col_h] = col_vals
-                print(col_h + " : " + str(len(col_vals)))
+        # columns_dict = {}
+        # for column in columns:
+        #     column.parse()
+        #     for col_h, col_vals in column.get():
+        #         columns_dict[col_h] = col_vals
+        #         print(col_h + " : " + str(len(col_vals)))
+        #
+        #         if col_h == "Pos.":
+        #             print(col_vals)
 
-                if col_h == "Pos.":
-                    print(col_vals)
-
+        return table
 
         # make df
-        df = pd.DataFrame(columns_dict)
-
-        # change dtypes
-        for col in columns:
-            if isinstance(col, NumericColumn):
-                df = df.astype({col.label: 'float64'})
-
-        return df
-
+        # df = pd.DataFrame(columns_dict)
+        #
+        # # change dtypes
+        # for col in columns:
+        #     if isinstance(col, NumericColumn):
+        #         df = df.astype({col.label: 'float64'})
+        #
+        # return df
 
     def __parse_header(self, theader, guess_types, dtypes):
 
@@ -240,7 +253,7 @@ class TScraper:
                 if th.has_attr("colspan"):
                     col.colspan = int(th["colspan"])
                     for j in range(int(th["colspan"]) - 1):
-                        newcol = Column(txt + "_" + str(j+1))
+                        newcol = Column(txt + "_" + str(j + 1))
                         cols.append(newcol)
 
         return cols
@@ -249,11 +262,11 @@ class TScraper:
 
         values = []
 
-        filtered = list(filter(lambda x: not (x.has_attr('class') and "hide" in x['class']) , td_arr))
+        filtered = list(filter(lambda x: not (x.has_attr('class') and "hide" in x['class']), td_arr))
 
         for z, col in enumerate(columns):
 
-            if not len(td_arr)>z:
+            if not len(td_arr) > z:
                 col.add(None)
             else:
                 td = filtered[z]

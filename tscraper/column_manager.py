@@ -3,6 +3,7 @@ from bs4 import BeautifulSoup
 import pandas as pd
 import re
 
+from .settings import *
 from .parser import parse_generic, parse_numeric, parse_player, parse_date
 
 """ Boolean
@@ -11,6 +12,96 @@ from .parser import parse_generic, parse_numeric, parse_player, parse_date
 def is_column_meaningful(mylist):
     return len(list(filter(lambda val: val is not None, mylist))) > 0
 
+
+
+class VirtualTable:
+
+    def __init__(self, theader, guess_types, dtypes):
+        self.columns = {}
+        self.parse_header(theader, guess_types, dtypes)
+        # for c_name in self.columns_names:
+        #     self.columns[c_name] = []
+
+    def __eq__(self, other):
+        if len(self.columns) == len(other.columns):
+            for c_name in self.columns:
+                if c_name not in other.columns:
+                    return False
+            return True
+        return False
+
+    def add(self, other):
+        if self == other:
+            for k in self.columns:
+                self.columns[k].td_s.extend(other.columns[k].td_s)
+
+
+    def parse_header(self, theader, guess_types, dtypes):
+
+        th_s = theader.find_all("th")
+
+        for i, th in enumerate(th_s):
+            if (th.has_attr('class')) and ("hide" in th['class']):
+                pass
+            else:
+                txt = th.text.strip()
+                if txt == "" and th.find("span", {"class": TABLE_HEADER_ICON_CLASS}):
+                    if th.find("span", {"class": TABLE_HEADER_ICON_CLASS}).has_attr("title"):
+                        txt = th.find("span", {"class": TABLE_HEADER_ICON_CLASS})["title"]
+
+                col = Column(txt)
+
+                if txt in dtypes:
+                    datatype = dtypes[txt]
+                    if datatype == PLAYER:
+                        col = PlayerColumn(txt)
+                    elif datatype == TEAM:
+                        col = TeamColumn(txt)
+                    elif datatype == NUMERIC:
+                        col = NumericColumn(txt)
+                    elif datatype == DATETIME:
+                        col = DateColumn(txt)
+
+                elif guess_types:
+                    for kw in PLAYER_COLUMN_KEYWORDS:
+                        if kw in txt.lower():
+                            col = PlayerColumn(txt)
+                            break
+                    for kw in INTEGER_COLUMN_KEYWORDS:
+                        if kw in txt.lower():
+                            col = NumericColumn(txt)
+                            break
+
+                self.columns[txt] = col
+
+                if th.has_attr("colspan"):
+                    col.colspan = int(th["colspan"])
+                    for j in range(int(th["colspan"]) - 1):
+                        newcol = Column(txt + "_" + str(j + 1))
+                        self.columns[txt + "_" + str(j + 1)] = newcol
+
+    def parse_row(self, td_arr):
+        values = []
+        filtered = list(filter(lambda x: not (x.has_attr('class') and "hide" in x['class']), td_arr))
+
+        for z, col_key in enumerate(self.columns):
+            col = self.columns[col_key]
+            if not len(td_arr) > z:
+                col.add(None)
+            else:
+                td = filtered[z]
+                col.add(td)
+
+        return values
+
+    def get(self):
+        tmp = {}
+        for k in self.columns:
+            column = self.columns[k]
+            column.parse()
+            for col_h, col_vals in column.get():
+                tmp[col_h] = col_vals
+        return tmp
 
 class Column:
     nameSet = None
